@@ -817,9 +817,8 @@ func newClusters(cfg []config.Cluster) (map[string]*cluster, error) {
 	return clusters, nil
 }
 
-// getReplica returns least loaded + round-robin replica from the cluster.
-//
-// Always returns non-nil.
+// getReplica returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
 func (c *cluster) getReplica() *replica {
 	n := uint32(len(c.replicas))
 	if n == 0 {
@@ -909,9 +908,8 @@ func (r *replica) getHostSticky(sessionId string) *topology.Node {
 	return h
 }
 
-// getHost returns least loaded + round-robin host from replica.
-//
-// Always returns non-nil.
+// getHost returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
 func (r *replica) getHost() *topology.Node {
 	n := uint32(len(r.hosts))
 	if n == 0 {
