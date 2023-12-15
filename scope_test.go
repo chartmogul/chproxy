@@ -121,32 +121,15 @@ func TestGetHost(t *testing.T) {
 		topology.NewNode(&url.URL{Host: "127.0.0.3"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
 	}
 
-	// step | expected  | hosts running queries
-	// 1    | 127.0.0.2 | 0, 1, 0
-	// 2    | 127.0.0.3 | 0, 1, 1
-	// 3    | 127.0.0.1 | 1, 1, 1
-	// 4    | 127.0.0.2 | 1, 2, 2
-	// 5    | 127.0.0.1 | 2, 2, 2
-	// 6    | 127.0.0.1 | 3, 7, 2	// 2nd is penalized for `penaltySize`
-	// 7    | 127.0.0.1 | 3, 7, 3
-
-	// step: 1
+	// all hosts are up, so always choose the first one
 	h := c.getHost()
-	expected := "127.0.0.2"
+	expected := "127.0.0.1"
 	if h.Host() != expected {
 		t.Fatalf("got host %q; expected %q", h.Host(), expected)
 	}
 	h.IncrementConnections()
 
-	// step: 2
-	h = c.getHost()
-	expected = "127.0.0.3"
-	if h.Host() != expected {
-		t.Fatalf("got host %q; expected %q", h.Host(), expected)
-	}
-	h.IncrementConnections()
-
-	// step: 3
+	// all hosts are up, so always choose the first one
 	h = c.getHost()
 	expected = "127.0.0.1"
 	if h.Host() != expected {
@@ -154,7 +137,14 @@ func TestGetHost(t *testing.T) {
 	}
 	h.IncrementConnections()
 
-	// step: 4
+
+	r.hosts = []*topology.Node{
+		topology.NewNode(&url.URL{Host: "127.0.0.1"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+		topology.NewNode(&url.URL{Host: "127.0.0.2"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
+		topology.NewNode(&url.URL{Host: "127.0.0.3"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
+	}
+
+	// first is down, so choose the next one
 	h = c.getHost()
 	expected = "127.0.0.2"
 	if h.Host() != expected {
@@ -162,39 +152,51 @@ func TestGetHost(t *testing.T) {
 	}
 	h.IncrementConnections()
 
-	// inc last host to get least-loaded 1st host
-	r.hosts[2].IncrementConnections()
-
-	// step: 5
+	// first is still down, so choose the next one
 	h = c.getHost()
-	expected = "127.0.0.1"
+	expected = "127.0.0.2"
 	if h.Host() != expected {
 		t.Fatalf("got host %q; expected %q", h.Host(), expected)
 	}
 	h.IncrementConnections()
 
-	// penalize 2nd host
-	h = r.hosts[1]
-	expRunningQueries := topology.DefaultPenaltySize + h.CurrentLoad()
-	h.Penalize()
-	if h.CurrentLoad() != expRunningQueries {
-		t.Fatalf("got host %q running queries %d; expected %d", h.Host(), h.CurrentLoad(), expRunningQueries)
+	r.hosts = []*topology.Node{
+		topology.NewNode(&url.URL{Host: "127.0.0.1"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+		topology.NewNode(&url.URL{Host: "127.0.0.2"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+		topology.NewNode(&url.URL{Host: "127.0.0.3"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
 	}
 
-	// step: 6
-	// we got "127.0.0.1" because index it's 6th step, hence index is = 0
-	h = c.getHost()
-	expected = "127.0.0.1"
-	if h.Host() != expected {
-		t.Fatalf("got host %q; expected %q", h.Host(), expected)
-	}
-	h.IncrementConnections()
-
-	// step: 7
-	// we got "127.0.0.3"; index = 1, means to get 2nd host, but it has runningQueries=7
-	// so we will get next least loaded
+	// first and second are down, so choose the next one
 	h = c.getHost()
 	expected = "127.0.0.3"
+	if h.Host() != expected {
+		t.Fatalf("got host %q; expected %q", h.Host(), expected)
+	}
+	h.IncrementConnections()
+
+	r.hosts = []*topology.Node{
+		topology.NewNode(&url.URL{Host: "127.0.0.1"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+		topology.NewNode(&url.URL{Host: "127.0.0.2"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+		topology.NewNode(&url.URL{Host: "127.0.0.3"}, nil, "", r.name, topology.WithDefaultActiveState(false)),
+	}
+
+	// all are down, so choose the first one even if it's down
+	h = c.getHost()
+	expected = "127.0.0.1"
+	if h.Host() != expected {
+		t.Fatalf("got host %q; expected %q", h.Host(), expected)
+	}
+	h.IncrementConnections()
+
+	r.hosts = []*topology.Node{
+		topology.NewNode(&url.URL{Host: "127.0.0.1"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
+		topology.NewNode(&url.URL{Host: "127.0.0.2"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
+		topology.NewNode(&url.URL{Host: "127.0.0.3"}, nil, "", r.name, topology.WithDefaultActiveState(true)),
+	}
+
+	// all hosts are up, so always choose the first one
+	h = c.getHost()
+	expected = "127.0.0.1"
 	if h.Host() != expected {
 		t.Fatalf("got host %q; expected %q", h.Host(), expected)
 	}
