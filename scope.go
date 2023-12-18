@@ -817,9 +817,59 @@ func newClusters(cfg []config.Cluster) (map[string]*cluster, error) {
 	return clusters, nil
 }
 
-// getReplica returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
-// If no hosts are available, returns the first one anyway.
+// getReplica returns least loaded + round-robin replica from the cluster.
+//
+// Always returns non-nil.
 func (c *cluster) getReplica() *replica {
+	// Always implement the first replica is active check
+	if r := c.getFirstReplica(); r != nil {
+		return r
+	}
+
+	idx := atomic.AddUint32(&c.nextReplicaIdx, 1)
+	n := uint32(len(c.replicas))
+	if n == 1 {
+		return c.replicas[0]
+	}
+
+	idx %= n
+	r := c.replicas[idx]
+	reqs := r.load()
+
+	// Set least priority to inactive replica.
+	if !r.isActive() {
+		reqs = ^uint32(0)
+	}
+
+	if reqs == 0 {
+		return r
+	}
+
+	// Scan all the replicas for the least loaded replica.
+	for i := uint32(1); i < n; i++ {
+		tmpIdx := (idx + i) % n
+		tmpR := c.replicas[tmpIdx]
+		if !tmpR.isActive() {
+			continue
+		}
+		tmpReqs := tmpR.load()
+		if tmpReqs == 0 {
+			return tmpR
+		}
+		if tmpReqs < reqs {
+			r = tmpR
+			reqs = tmpReqs
+		}
+	}
+	// The returned replica may be inactive. This is OK,
+	// since this means all the replicas are inactive,
+	// so let's try proxying the request to any replica.
+	return r
+}
+
+// getFirstReplica returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
+func (c *cluster) getFirstReplica() *replica {
 	n := uint32(len(c.replicas))
 	if n == 0 {
 		return nil // No replicas available
@@ -843,7 +893,6 @@ func (c *cluster) getReplica() *replica {
 	// No active replicas found, return the first one (even if it's inactive)
 	return firstReplica
 }
-
 
 func (c *cluster) getReplicaSticky(sessionId string) *replica {
 	idx := atomic.AddUint32(&c.nextReplicaIdx, 1)
@@ -908,9 +957,60 @@ func (r *replica) getHostSticky(sessionId string) *topology.Node {
 	return h
 }
 
-// getHost returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
-// If no hosts are available, returns the first one anyway.
+// getHost returns least loaded + round-robin host from replica.
+//
+// Always returns non-nil.
 func (r *replica) getHost() *topology.Node {
+	// Always implement the first host is active check
+	if h := r.getFirstHost(); h != nil {
+		return h
+	}
+
+	idx := atomic.AddUint32(&r.nextHostIdx, 1)
+	n := uint32(len(r.hosts))
+	if n == 1 {
+		return r.hosts[0]
+	}
+
+	idx %= n
+	h := r.hosts[idx]
+	reqs := h.CurrentLoad()
+
+	// Set least priority to inactive host.
+	if !h.IsActive() {
+		reqs = ^uint32(0)
+	}
+
+	if reqs == 0 {
+		return h
+	}
+
+	// Scan all the hosts for the least loaded host.
+	for i := uint32(1); i < n; i++ {
+		tmpIdx := (idx + i) % n
+		tmpH := r.hosts[tmpIdx]
+		if !tmpH.IsActive() {
+			continue
+		}
+		tmpReqs := tmpH.CurrentLoad()
+		if tmpReqs == 0 {
+			return tmpH
+		}
+		if tmpReqs < reqs {
+			h = tmpH
+			reqs = tmpReqs
+		}
+	}
+
+	// The returned host may be inactive. This is OK,
+	// since this means all the hosts are inactive,
+	// so let's try proxying the request to any host.
+	return h
+}
+
+// getFirstHost returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
+func (r *replica) getFirstHost() *topology.Node {
 	n := uint32(len(r.hosts))
 	if n == 0 {
 		return nil // No hosts available
@@ -934,7 +1034,6 @@ func (r *replica) getHost() *topology.Node {
 	// No active hosts found, return the first one (even if it's inactive)
 	return firstHost
 }
-
 
 // getHostSticky returns host based on stickiness from cluster.
 //
