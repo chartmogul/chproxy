@@ -871,27 +871,23 @@ func (c *cluster) getReplica() *replica {
 // If no hosts are available, returns the first one anyway.
 func (c *cluster) getFirstReplica() *replica {
 	n := uint32(len(c.replicas))
-	if n == 0 {
-		return nil // No replicas available
-	}
 
 	// Check if the first replica is active
-	firstReplica := c.replicas[0]
-	if firstReplica.isActive() {
-		return firstReplica
+	r := c.replicas[0]
+	if r.isActive() {
+		return r
 	}
 
 	// If the first replica is not active, find the next active one
 	for i := uint32(1); i < n; i++ {
-		idx := (i) % n
-		r := c.replicas[idx]
+		r := c.replicas[i]
 		if r.isActive() {
 			return r
 		}
 	}
 
 	// No active replicas found, return the first one (even if it's inactive)
-	return firstReplica
+	return r
 }
 
 func (c *cluster) getReplicaSticky(sessionId string) *replica {
@@ -1012,27 +1008,23 @@ func (r *replica) getHost() *topology.Node {
 // If no hosts are available, returns the first one anyway.
 func (r *replica) getFirstHost() *topology.Node {
 	n := uint32(len(r.hosts))
-	if n == 0 {
-		return nil // No hosts available
-	}
-
+	
 	// Check if the first host is active
-	firstHost := r.hosts[0]
-	if firstHost.IsActive() {
-		return firstHost
+	h := r.hosts[0]
+	if h.IsActive() {
+		return h
 	}
 
 	// If the first host is not active, find the next active one
 	for i := uint32(1); i < n; i++ {
-		idx := (i) % n
-		h := r.hosts[idx]
+		h := r.hosts[i]
 		if h.IsActive() {
 			return h
 		}
 	}
 
 	// No active hosts found, return the first one (even if it's inactive)
-	return firstHost
+	return h
 }
 
 // getHostSticky returns host based on stickiness from cluster.
