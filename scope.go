@@ -821,6 +821,11 @@ func newClusters(cfg []config.Cluster) (map[string]*cluster, error) {
 //
 // Always returns non-nil.
 func (c *cluster) getReplica() *replica {
+	// Always implement the first replica is active check
+	if r := c.getFirstReplica(); r != nil {
+		return r
+	}
+
 	idx := atomic.AddUint32(&c.nextReplicaIdx, 1)
 	n := uint32(len(c.replicas))
 	if n == 1 {
@@ -859,6 +864,29 @@ func (c *cluster) getReplica() *replica {
 	// The returned replica may be inactive. This is OK,
 	// since this means all the replicas are inactive,
 	// so let's try proxying the request to any replica.
+	return r
+}
+
+// getFirstReplica returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
+func (c *cluster) getFirstReplica() *replica {
+	n := uint32(len(c.replicas))
+
+	// Check if the first replica is active
+	r := c.replicas[0]
+	if r.isActive() {
+		return r
+	}
+
+	// If the first replica is not active, find the next active one
+	for i := uint32(1); i < n; i++ {
+		r := c.replicas[i]
+		if r.isActive() {
+			return r
+		}
+	}
+
+	// No active replicas found, return the first one (even if it's inactive)
 	return r
 }
 
@@ -929,6 +957,11 @@ func (r *replica) getHostSticky(sessionId string) *topology.Node {
 //
 // Always returns non-nil.
 func (r *replica) getHost() *topology.Node {
+	// Always implement the first host is active check
+	if h := r.getFirstHost(); h != nil {
+		return h
+	}
+
 	idx := atomic.AddUint32(&r.nextHostIdx, 1)
 	n := uint32(len(r.hosts))
 	if n == 1 {
@@ -968,6 +1001,29 @@ func (r *replica) getHost() *topology.Node {
 	// The returned host may be inactive. This is OK,
 	// since this means all the hosts are inactive,
 	// so let's try proxying the request to any host.
+	return h
+}
+
+// getFirstHost returns the first host from replica unless it's inactive. In that case it moves to the next one in order. 
+// If no hosts are available, returns the first one anyway.
+func (r *replica) getFirstHost() *topology.Node {
+	n := uint32(len(r.hosts))
+	
+	// Check if the first host is active
+	h := r.hosts[0]
+	if h.IsActive() {
+		return h
+	}
+
+	// If the first host is not active, find the next active one
+	for i := uint32(1); i < n; i++ {
+		h := r.hosts[i]
+		if h.IsActive() {
+			return h
+		}
+	}
+
+	// No active hosts found, return the first one (even if it's inactive)
 	return h
 }
 
