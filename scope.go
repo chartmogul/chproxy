@@ -377,6 +377,16 @@ var allowedParams = []string{
 	"session_id",
 	// session timeout
 	"session_timeout",
+
+	// for ClickHouse
+	"max_execution_time",
+	"format_csv_null_representation",
+	"max_threads",
+	"use_query_cache",
+	"query_cache_min_query_duration",
+	"query_cache_ttl",
+	"cancel_http_readonly_queries_on_client_close",
+	"query_cache_store_results_of_queries_with_nondeterministic_functions",
 }
 
 // This regexp must match params needed to describe a way to use external data
