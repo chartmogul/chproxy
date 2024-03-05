@@ -408,7 +408,8 @@ func (s *scope) decorateRequest(req *http.Request) (*http.Request, url.Values) {
 	origParams := req.URL.Query()
 	for _, param := range allowedParams {
 		val := origParams.Get(param)
-		if len(val) > 0 {
+		// always allow format_csv_null_representation 
+		if len(val) > 0 && param != "format_csv_null_representation" {
 			params.Set(param, val)
 		}
 	}
